@@ -2,7 +2,6 @@
 #include <string.h>
 #include <task.h>
 #include <uv.h>
-#include "http_parser.h"
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -17,7 +16,7 @@ uv_tcp_t server;
 #define RESPONSE                  \
   "HTTP/1.1 200 OK\r\n"           \
   "Content-Type: text/plain\r\n"  \
-  "Content-Length: 12\r\n"        \
+  "Content-Length: 11\r\n"        \
   "\r\n"                          \
   "vietpro vip\n"
 void echo_write(uv_write_t* req, int status);
@@ -26,7 +25,6 @@ struct sockaddr_in addr;
 
 typedef struct {
   uv_tcp_t handle;
-  http_parser parser;
 } client_t;
 
 typedef struct {
@@ -34,18 +32,8 @@ typedef struct {
     uv_buf_t buf;
 } write_req_t;
 
-static http_parser_settings parser_settings;
 void *thread_handle_http_client_connect(uv_stream_t* handle);
-int headers_complete_cb(http_parser* parser) {
-  printf("Server header_complete_cb\n");
-  client_t *client = (client_t *) parser->data;
-  uv_write_t *write_req = (uv_write_t *)malloc(sizeof(uv_write_t));
-  uv_buf_t buf = uv_buf_init(RESPONSE, sizeof(RESPONSE));
-  //write_req->buf = uv_buf_init(RESPONSE, sizeof(RESPONSE));
-  int r = uv_write(write_req, (uv_stream_t *) &client->handle, &buf, 1, echo_write);
-  ASSERT(r == 0);
-  return 1;
-}
+
 
 ///Callback function to release resources
 void free_write_req(uv_write_t* req) {
@@ -98,7 +86,7 @@ void echo_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
         //strcpy(data_receive, buf->base);
         //uv_thread_create(&hare_id, (void *) thread_handle_http_client_connect,(uv_stream_t*) handle);
  
-        size_t parsed = http_parser_execute(&client->parser, &parser_settings, buf->base, nread);
+        //size_t parsed = http_parser_execute(&client->parser, &parser_settings, buf->base, nread);
 		 uv_buf_t Mybuf = uv_buf_init(RESPONSE, sizeof(RESPONSE));
 		 //req->buf = uv_buf_init(RESPONSE, sizeof(RESPONSE));
          uv_write((uv_write_t*)req, (uv_stream_t*)client, &Mybuf, 1, echo_write);
@@ -129,16 +117,16 @@ void *thread_handle_http_client_connect(uv_stream_t* server) {
 
     if (uv_accept((uv_stream_t *)server, (uv_stream_t*)&client->handle) == 0) {
 		printf("Start reading data....\n");
+        if (uv_is_readable((uv_stream_t *) client )) {
+            uv_read_start((uv_stream_t *)client, alloc_buffer, echo_read);
+        } else {
+            printf("not readable \n");
+        }
         
-        http_parser_init(&client->parser, HTTP_REQUEST);
-        client->parser.data = client;
-        printf("parrser done\n");
-        uv_read_start((uv_stream_t *)client, alloc_buffer, echo_read);
     } else {
         uv_close((uv_handle_t*)client, NULL);
     }
     printf("done on_new_connection\n");
-    
 }
 
 // void *thread_handle_http_client_connect(uv_stream_t* handle)
@@ -179,6 +167,7 @@ void on_new_connection(uv_stream_t* server, int status) {
     //client->handle.data = client;
     //printf("Dia chi client %d, va dia chi client->handle.data la second %d va client->handle = %d\n",client ,client->handle, &client->handle.data);
     uv_thread_create(&hare_id, (void *) thread_handle_http_client_connect,(uv_stream_t*) server);
+    
     printf("done on_new_connection\n");
 }
 
@@ -186,8 +175,6 @@ int main() {
 
 
     loop = uv_default_loop();
-
-    parser_settings.on_headers_complete = headers_complete_cb;
 
     uv_tcp_init(loop, &server);
 
