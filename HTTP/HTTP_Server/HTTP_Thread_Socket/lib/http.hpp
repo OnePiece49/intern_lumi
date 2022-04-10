@@ -20,16 +20,6 @@
 
 using namespace std;
 
-#define PORT_NUMBER 7000
-#define BUF_SIZE 500
-
-#define RESPONSE                  \
-  "HTTP/1.1 200 OK\r\n"           \
-  "Content-Type: text/plain\r\n"  \
-  "Content-Length: 11\r\n"        \
-  "\r\n"                          \
-  "vietpro vip\r\n"
-
 #define LINE_HEADER                \
   "HTTP/1.1 200 OK\r\n"            \
   "Content-Type: text/plain\r\n"   \
@@ -39,16 +29,13 @@ using namespace std;
 
         
 class Http {
-    private:
-        int fd_server;
-        void accept_connect(); 
-        static void dong_goi_ban_tin(char *respond, char *body, char *content_length);         
-        static void ban_tin(char *respond);
-        static void *thread_handle_respond(void *fddata);
-    public:
-        Http(int fd_server);
-        Http(){};
-        void init_http();
-};
+    private: 
+        static void *ThreadHandleRespond(void *fddata);
 
+    public:
+        static int AcceptConnect(int *fd_server);
+        static void InitHttp(int *fd_server, int Port);
+        static void GetHttpRequest(int *fd);
+        static void SendHttpRespond(int *fd);   
+};
 #endif
