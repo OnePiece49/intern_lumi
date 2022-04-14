@@ -17,7 +17,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include <vector>
+#include "registerAPI.hpp"
 using namespace std;
 
 #define LINE_HEADER                \
@@ -27,15 +28,21 @@ using namespace std;
 #define CONTENT_LENGTH             \
   "Content-Length: "               \
 
+
+typedef struct {
+  int fd_server;
+  int fd_data;
+  vector<s_api *> MyApi;
+}s_fdserver;
         
 class Http {
     private: 
         static void *ThreadHandleRespond(void *fddata);
 
     public:
-        static int AcceptConnect(int *fd_server);
-        static void InitHttp(int *fd_server, int Port);
-        static void GetHttpRequest(int *fd);
-        static void SendHttpRespond(int *fd);   
+        static int AcceptConnect(s_fdserver *fd);
+        static void InitHttp(s_fdserver *fd, int port);
+        static void GetHttpRequest(s_fdserver *fd);
+        static void SendHttpRespond(s_fdserver *fd);   
 };
 #endif
