@@ -1,14 +1,23 @@
 #include <iostream>
+#include <vector>
+
 using namespace std;
 
-class hello{
-    public:
-        static void hihi() {
-            cout << "Hello wibu" << endl;
-        }
-};
+typedef struct {
+    int a;
+    string hello;
+}hihi;
+
+void hello(vector<hihi> &arr) {
+    arr.push_back(hihi());
+    arr[0].a = 5;
+    arr[0].hello = "helo world";
+    
+}
 
 int main()
 {
-    hello:: hihi();
+    vector<hihi> arr;
+    hello(arr);
+    cout << arr[0].hello << endl;
 }

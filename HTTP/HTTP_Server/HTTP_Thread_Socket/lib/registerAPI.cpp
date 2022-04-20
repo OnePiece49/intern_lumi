@@ -2,30 +2,34 @@
 #include <iostream>
 using namespace std;
 
-void MyApi:: RegisterApi(string method, string url, void (*callback)(void *), void *para, int *number_api, vector<s_api *> &MyApi) {
+void MyApi:: RegisterApi(methodHttp method, string url, void (*callback)(void *), void *para, vector<s_api> &MyApi) {
     int check = 5;
-    string method_http[5]{"GET", "POST", "PUT", "PATCH", "DELETE"};
+    for (int i = 0; i < MyApi.size(); i++) {
+        if (ApiServer[i].method == method && ApiServer[i].url == url) {
+            cout << "Api is exist" << endl;
+            return;
+        }
+    }
+
     for (int i = 0; i < 5; i++) {
-        if (method.compare(method_http[i]) == 0) {
+        if (method == i) {
             if (callback == NULL) {
                 cout << "Callback must be a function" << endl;
                 return;
             }
-            s_api *newAPI = new s_api;
-            
-            newAPI->method = method;
-            newAPI->url = url;
-            newAPI->func = callback;
-            if(para != NULL) {
-                newAPI->parameter = para;
+            MyApi.push_back(s_api());
+            MyApi[number_api].method = method; 
+            MyApi[number_api].url = url; 
+            MyApi[number_api].parameter = para; 
+            if(callback != NULL) {
+                MyApi[*number_api].func = callback; 
             }
-            MyApi.push_back(newAPI); 
-            (*number_api)++;
+            number_api++;
 
         } else {
             check--;
             if(check == 0) {
-                cout << "Not Method Invalid" << endl;
+                cout << "Not Method valid" << endl;
                 return;
             }
         }
@@ -33,10 +37,10 @@ void MyApi:: RegisterApi(string method, string url, void (*callback)(void *), vo
 }
 
 
-void MyApi:: checkApi(string method, string url, vector<s_api *> MyApi) {
-    for (int i = 0; i < MyApi.size(); i++) {
-        if (MyApi[i]->method == method && MyApi[i]->url == url) {
-            MyApi[i]->func(MyApi[i]->parameter);
+void MyApi:: checkApi(methodHttp method, string url, vector<s_api> ApiServer) {
+    for (int i = 0; i < ApiServer.size(); i++) {
+        if (ApiServer[i].method == method && ApiServer[i].url == url) {
+            ApiServer[i].func(MyApi[i].parameter);
             return;
         } 
     }

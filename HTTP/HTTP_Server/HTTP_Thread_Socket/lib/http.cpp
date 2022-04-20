@@ -1,11 +1,59 @@
 #include "http.hpp"
-#include "registerAPI.hpp"
 #include <string.h>
 #include <string>
 
 using namespace std;
 
-void Http:: SendHttpRespond(s_fdserver *fd) {
+void HttpServer:: RegisterApi(methodHttp method, string url, void (*callback)(void *, int *), void *para) {
+    int check = 5;
+    if (Server.MyApi.size() != 0) {
+        for (int i = 0; i < Server.MyApi.size() + 1; i++) {
+            if (Server.MyApi[i].method == method && Server.MyApi[i].url == url) {
+                cout << "Api is exist" << endl;
+                return;
+            }
+        }
+    }
+
+    for (int i = 0; i < 5; i++) {
+        if (method == i) {
+            if (callback == NULL) {
+                cout << "Callback must be a function" << endl;
+                return;
+            }
+            Server.MyApi.push_back(s_api());
+            Server.MyApi[number_api].method = method; 
+            Server.MyApi[number_api].url = url; 
+            Server.MyApi[number_api].parameter = para; 
+            if(callback != NULL) {
+                Server.MyApi[number_api].func = callback; 
+            }
+            number_api++;
+            
+        } else {
+            check--;
+            if(check == 0) {
+                cout << "Not Method valid" << endl;
+                return;
+            }
+        }
+    }
+}
+
+void HttpServer:: CheckApi(methodHttp method, string url, s_fdclient *fddata) {
+    cout << "Entered checkAPi" << endl;
+    for (int i = 0; i < fddata->MyApi.size(); i++) {
+        if (fddata->MyApi[i].method == method && fddata->MyApi[i].url == url) {
+            fddata->MyApi[i].func(fddata->MyApi[i].parameter, &fddata->fd_data);
+            delete fddata;
+            fddata = nullptr;
+            return;
+        } 
+    }
+    cout << "None of API Regitered" << endl;
+}
+
+void HttpServer:: SendHttpRespond(int *fd) {
     char respond[400] = {0};
     char data_body[200] = {0};
     char content_length[20] = {0};
@@ -31,57 +79,81 @@ void Http:: SendHttpRespond(s_fdserver *fd) {
     strcat(respond, new_line);              // /r/n
     strcat(respond, data_body);             // /r/n
     strcat(respond, new_line);              // body
-    write(fd->fd_data, respond , strlen(respond));
+    write(*fd, respond , strlen(respond));
 }
 
-void Http:: GetHttpRequest(s_fdserver *fd) {
+void HttpServer:: GetHttpRequest(s_fdclient *fd) {
     int byte_read = 0;
     char buf[500] = {0};
     char respond[300];
 
-    byte_read =  read(fd->fd_data, buf, 500);
+    byte_read =  read(fd->fd_data, buf, MAXSIZE);
     cout << "Data receive : " << buf << endl;
 
     char *token_method = strtok(buf, " ");
     char *token_url = strtok(NULL, " ");
+    int methodHtpp;
     string method(token_method);
     string url(token_url);
-    cout << "Method : " <<  method  << "path : " << url << "." << endl;
-    MyApi:: checkApi(method, url, fd->MyApi); 
+
+    if (method ==  "GET") {
+        CheckApi(GET, url, fd); 
+    } else if (method ==  "POST") {
+        CheckApi(POST, url, fd); 
+    } else if (method ==  "PUT") {
+        CheckApi(PUT, url, fd); 
+    } else if (method ==  "PATCH") {
+        CheckApi(PATCH, url, fd); 
+    } else if (method ==  "DELETE") {
+        CheckApi(DELETE, url, fd); 
+    } else {
+        cout << "Not method valid!" << endl;
+        return;
+    }
 }
 
-void* Http:: ThreadHandleRespond(void *fd) {
-    s_fdserver *fddata = (s_fdserver *)fd;
+void* HttpServer:: ThreadHandleRespond(void *fd) {
+    pthread_detach(pthread_self());
+    s_fdclient *fddata = (s_fdclient *)fd;
+    int *numThread = fddata->number_thread;
+
     GetHttpRequest(fddata);
-    //SendHttpRespond(fddata);
+    (*numThread)++;
     return NULL;
 }
 
-int Http:: AcceptConnect(s_fdserver *fd) {
+void HttpServer::  AcceptConnect() {
+    static int number_thread = 2;
     pthread_t threadID;
     struct sockaddr_in claddr = {0};
     socklen_t len = sizeof(claddr);
+    s_fdclient *coppyHttpServer = new s_fdclient;
 
-    if ((fd->fd_data = accept(fd->fd_server , (struct sockaddr *)&claddr, &len))  == -1) {
-        cout << "server not accept";
+    coppyHttpServer->number_thread = &number_thread;
+    while(number_thread == 0);
+    number_thread--;
+    coppyHttpServer->fd_data = accept(Server.fd_server , (struct sockaddr *)&claddr, &len);
+    if (coppyHttpServer->fd_data  == -1) {
+        cout << "server not accept" << endl;
         exit;
     } else {
-       pthread_create(&threadID, NULL, ThreadHandleRespond, (void *) fd);
-       cout << "accept connect" << endl;
+        coppyHttpServer->MyApi = Server.MyApi;
+        pthread_create(&threadID, NULL,  ThreadHandleRespond, (void *)coppyHttpServer);
+        cout << "accept connect" << endl;
     }
-    return fd->fd_data;
 }
 
-void Http:: InitHttp(s_fdserver *fd, int port) {
+
+void HttpServer:: InitHttp(int port) {
     int opt;
     //B1 : khoi tao socket
-    fd->fd_server = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd->fd_server == -1) {
+    Server.fd_server = socket(AF_INET, SOCK_STREAM, 0);
+    if (Server.fd_server == -1) {
         cout << "cannot intiatize socket " << endl;
         return;
     }
-    
-    if (setsockopt(fd->fd_server, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+
+    if (setsockopt(Server.fd_server, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
         perror("setsockopt()"); 
 
     //B2 : Need to gán các thông số cho file socket "fd" đã tạo trên qua biến trung gian struct
@@ -89,17 +161,23 @@ void Http:: InitHttp(s_fdserver *fd, int port) {
     svaddr.sin_family = AF_INET;
     svaddr.sin_addr.s_addr = INADDR_ANY; 
     svaddr.sin_port = htons(port);
-    
+
     //B3 : Gán thông số cho file socket "fd" qua biến trung gian svaddr nhờ hàm
-    if (bind(fd->fd_server, (struct sockaddr *)&svaddr, sizeof(struct sockaddr_in)) == -1) {
+    int bindState = bind(Server.fd_server, (struct sockaddr *)&svaddr, sizeof(struct sockaddr_in));
+    if (bindState == -1) {
         cout << "cannot bind socket " << endl;
-        exit;
+        return;
     }
 
     //B4: Khởi tạo điều kiện cho phép tối đa bao nhiêu client kết nối tới ở hàng đợi
-    if( listen(fd->fd_server, 128) == -1) {
+    if (listen(Server.fd_server, 128) == -1) {
         cout << "lisen failed " << endl;
-        exit;
+        return;
     } 
-    cout << "lisen OK" << endl;    
+    cout << "lisen OK in port " << port << endl; 
+ 
+    while (1)
+    {
+        AcceptConnect();
+    }
 }

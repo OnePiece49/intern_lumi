@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <vector>
-#include "registerAPI.hpp"
+//#include "registerAPI.hpp"
 using namespace std;
 
 #define LINE_HEADER                \
@@ -28,21 +28,59 @@ using namespace std;
 #define CONTENT_LENGTH             \
   "Content-Length: "               \
 
+#define RESPONSE                  \
+  "HTTP/1.1 200 OK\r\n"           \
+  "Content-Type: text/plain\r\n"  \
+  "Content-Length: 11\r\n"        \
+  "\r\n"                          \
+  "vietpro vip\n"
+  
+typedef enum  {
+  GET = 0,
+  POST = 1,
+  PUT = 2,
+  PATCH = 3,
+  DELETE = 4,
+}methodHttp;
+
+typedef void (*MyFunc )(void *, int *);
+
+typedef struct {
+  int method;
+  string url;
+  MyFunc func;
+  void *parameter;
+}s_api;
+
 
 typedef struct {
   int fd_server;
-  int fd_data;
-  vector<s_api *> MyApi;
+  vector<s_api> MyApi;
 }s_fdserver;
-        
-class Http {
-    private: 
-        static void *ThreadHandleRespond(void *fddata);
 
-    public:
-        static int AcceptConnect(s_fdserver *fd);
-        static void InitHttp(s_fdserver *fd, int port);
-        static void GetHttpRequest(s_fdserver *fd);
-        static void SendHttpRespond(s_fdserver *fd);   
+typedef struct {
+  int fd_data;
+  int *number_thread;
+  vector<s_api> MyApi;
+}s_fdclient;
+
+class HttpServer {
+  private: 
+    #define MAXSIZE 65536
+    
+    s_fdserver Server;
+    int number_api = 0;
+
+    static void CheckApi(methodHttp method, string url,s_fdclient *fd); 
+    static void *ThreadHandleRespond(void *fddata);
+    static void  GetHttpRequest(s_fdclient *fd);
+    void  AcceptConnect();
+    
+    
+  public:
+    void InitHttp(int port);
+    void RegisterApi(methodHttp method, string url, void (*callback)(void *, int *), void *para);
+    static void SendHttpRespond(int *fd);
 };
+
 #endif
