@@ -28,13 +28,9 @@ using namespace std;
 #define CONTENT_LENGTH             \
   "Content-Length: "               \
 
-#define RESPONSE                  \
-  "HTTP/1.1 200 OK\r\n"           \
-  "Content-Type: text/plain\r\n"  \
-  "Content-Length: 11\r\n"        \
-  "\r\n"                          \
-  "vietpro vip\n"
-  
+
+
+typedef void (*MyFunc )(void *, string *);
 typedef enum  {
   GET = 0,
   POST = 1,
@@ -43,7 +39,14 @@ typedef enum  {
   DELETE = 4,
 }methodHttp;
 
-typedef void (*MyFunc )(void *, int *);
+typedef enum  {
+  Content_Type = 0,
+  Content_Length = 1,
+  content_encoding = 2,
+  set_cookie = 3,
+  Connection = 4,
+}e_header;
+
 
 typedef struct {
   int method;
@@ -51,7 +54,6 @@ typedef struct {
   MyFunc func;
   void *parameter;
 }s_api;
-
 
 typedef struct {
   int fd_server;
@@ -61,8 +63,13 @@ typedef struct {
 typedef struct {
   int fd_data;
   int *number_thread;
+  string httprespond;
   vector<s_api> MyApi;
 }s_fdclient;
+
+
+void SetHeaderHttpRespond(e_header key, string value, string *Respond);
+void SetBodyHttpRespond(string body, string *HttpRespond);
 
 class HttpServer {
   private: 
@@ -76,10 +83,9 @@ class HttpServer {
     static void  GetHttpRequest(s_fdclient *fd);
     void  AcceptConnect();
     
-    
   public:
     void InitHttp(int port);
-    void RegisterApi(methodHttp method, string url, void (*callback)(void *, int *), void *para);
+    void RegisterApi(methodHttp method, string url, void (*callback)(void *, string *), void *para);
     static void SendHttpRespond(int *fd);
 };
 

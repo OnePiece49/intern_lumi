@@ -4,7 +4,95 @@
 
 using namespace std;
 
-void HttpServer:: RegisterApi(methodHttp method, string url, void (*callback)(void *, int *), void *para) {
+static string  RESPONSE =                 
+  "HTTP/1.1 200 OK\r\n"           \
+  "Content-Type: text/plain\r\n"  \
+  "Content-Length: 11\r\n"        \
+  "\r\n"                          \
+  "vietpro vip\n";
+
+static string  ERRORRESPOND =                 
+  "HTTP/1.1 400 Bad Request\r\n"            \
+  "Content-Type: text/plain\r\n"            \
+  "Content-Length: 8\r\n"                   \
+  "\r\n"                                    \
+  "Bad API\n";
+
+static vector<string>httpHeader = {"Content-Type", "Content-Length", "content-encoding", "set-cookie", "Connection"};
+
+void SetHeaderHttpRespond(e_header key, string value, string *Respond) {
+    if (Respond->find(httpHeader.at(key)) != -1) {
+        int position_header = Respond->find(httpHeader.at(key));
+        int postion_content_header = Respond->find(" ", position_header);
+        int lengthContent = Respond->find("\r\n", position_header) - postion_content_header;
+        
+        Respond->erase(position_header + httpHeader.at(key).size() + 2, lengthContent - 1); // thừa 2 chỗ cho ": ",ko xóa kí tự /r
+        Respond->insert(position_header + httpHeader.at(key).size() + 2, value);
+        cout << Respond << endl;
+
+    } else {
+        string enter = "\r\n";
+        int first_position_enter = 0;
+        int second_position_enter = 0; 
+        int check = 0;
+
+        while (check != 2 && check != -2) {
+            first_position_enter = Respond->find("\r\n", second_position_enter + 1);
+            check = first_position_enter - second_position_enter;
+            if(check == 2 || check == 2) {
+                break;
+            }
+            second_position_enter = Respond->find("\r\n", first_position_enter + 1);
+            check = first_position_enter - second_position_enter;
+            //cout << first_position_enter << " " << second_position_enter << endl;
+            //sleep(1);
+        }
+        string header = httpHeader[key] + ": " + value + "\r\n";
+
+        if(check == 2) {
+            Respond->insert(first_position_enter, header);
+        } else {
+            Respond->insert(second_position_enter, header);
+        }
+        //cout << *Respond << endl;
+    }
+
+}
+
+void SetBodyHttpRespond(string body, string *HttpRespond) {
+    string enter = "\r\n";
+    int first_position_enter = 0;
+    int second_position_enter = 0; 
+    int check = 0;
+
+        while (check != 2 && check != -2) {
+            first_position_enter = HttpRespond->find("\r\n", second_position_enter + 1);
+            check = first_position_enter - second_position_enter;
+            //cout << first_position_enter << " " << second_position_enter << endl;
+            if(check == 2 || check == 2) {
+                break;
+            }
+            second_position_enter = HttpRespond->find("\r\n", first_position_enter + 1);
+            check = first_position_enter - second_position_enter;
+            //cout << first_position_enter << " " << second_position_enter << endl;
+            //sleep(1);
+        }
+
+        if(check == 2) {
+            HttpRespond->erase(first_position_enter + 2, HttpRespond->size() - first_position_enter);
+            //cout << HttpRespond << endl;
+            HttpRespond->insert(first_position_enter +2, body);
+            string lengthbody = to_string(body.size());
+            SetHeaderHttpRespond(Content_Length, lengthbody, HttpRespond);
+        } else {
+            HttpRespond->erase(second_position_enter + 2, HttpRespond->size() - second_position_enter);
+            //cout << HttpRespond << endl;
+            HttpRespond->insert(second_position_enter + 2, body);
+        }
+    cout << *HttpRespond << endl;
+}
+
+void HttpServer:: RegisterApi(methodHttp method, string url, void (*callback)(void *, string *), void *para) {
     int check = 5;
     if (Server.MyApi.size() != 0) {
         for (int i = 0; i < Server.MyApi.size() + 1; i++) {
@@ -41,16 +129,17 @@ void HttpServer:: RegisterApi(methodHttp method, string url, void (*callback)(vo
 }
 
 void HttpServer:: CheckApi(methodHttp method, string url, s_fdclient *fddata) {
-    cout << "Entered checkAPi" << endl;
     for (int i = 0; i < fddata->MyApi.size(); i++) {
         if (fddata->MyApi[i].method == method && fddata->MyApi[i].url == url) {
-            fddata->MyApi[i].func(fddata->MyApi[i].parameter, &fddata->fd_data);
+            fddata->MyApi[i].func(fddata->MyApi[i].parameter, &fddata->httprespond);
+            write(fddata->fd_data, fddata->httprespond.c_str() , strlen(fddata->httprespond.c_str()));
             delete fddata;
             fddata = nullptr;
             return;
         } 
     }
     cout << "None of API Regitered" << endl;
+    write(fddata->fd_data, ERRORRESPOND.c_str() , strlen(ERRORRESPOND.c_str()));
 }
 
 void HttpServer:: SendHttpRespond(int *fd) {
@@ -138,6 +227,7 @@ void HttpServer::  AcceptConnect() {
         exit;
     } else {
         coppyHttpServer->MyApi = Server.MyApi;
+        coppyHttpServer->httprespond = RESPONSE;
         pthread_create(&threadID, NULL,  ThreadHandleRespond, (void *)coppyHttpServer);
         cout << "accept connect" << endl;
     }
