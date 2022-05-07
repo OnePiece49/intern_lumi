@@ -45,6 +45,9 @@ typedef enum  {
   content_encoding = 2,
   set_cookie = 3,
   Connection = 4,
+  Accept_Encoding = 5,
+  Huy_ngu = 6,
+  Accept_langue = 7,
 }e_header;
 
 

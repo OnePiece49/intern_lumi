@@ -18,7 +18,7 @@ static string  ERRORRESPOND =
   "\r\n"                                    \
   "Bad API\n";
 
-static vector<string>httpHeader = {"Content-Type", "Content-Length", "content-encoding", "set-cookie", "Connection"};
+static vector<string>httpHeader = {"Content-Type", "Content-Length", "content-encoding", "set-cookie", "Connection", "Accept-Encoding", "Huy-ngu", "Accept_language"};
 
 void SetHeaderHttpRespond(e_header key, string value, string *Respond) {
     if (Respond->find(httpHeader.at(key)) != -1) {
